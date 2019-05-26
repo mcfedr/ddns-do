@@ -1,0 +1,17 @@
+image:
+  repository: mthssdrbrg/ddns-route53
+  tag: latest
+  pullPolicy: Always
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+resources: {}
+tolerations: []
+affinity: {}
+
+zoneId: ZXXXX
+recordSet: example.com.
+awsAccessKeyId: ""
+awsSecretAccessKey: ""

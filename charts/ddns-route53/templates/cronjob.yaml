@@ -1,0 +1,47 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: {{ include "ddns-route53.fullname" . }}
+  labels:
+{{ include "ddns-route53.labels" . | indent 4 }}
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: ddns-route53
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              env:
+                - name: DDNS_ROUTE53_TTL
+                  value: "300"
+                - name: DDNS_ROUTE53_ZONE_ID
+                  value: {{ .Values.zoneId }}
+                - name: DDNS_ROUTE53_RECORD_SET
+                  value: {{ .Values.recordSet }}
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "ddns-route53.fullname" . }}
+                      key: access_key_id
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "ddns-route53.fullname" . }}
+                      key: secret_access_key
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 8 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 8 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 8 }}
+          {{- end }}
+          restartPolicy: OnFailure
