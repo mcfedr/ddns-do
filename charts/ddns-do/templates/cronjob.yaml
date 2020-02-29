@@ -1,37 +1,32 @@
 apiVersion: batch/v1beta1
 kind: CronJob
 metadata:
-  name: {{ include "ddns-route53.fullname" . }}
+  name: {{ include "ddns-do.fullname" . }}
   labels:
-{{ include "ddns-route53.labels" . | indent 4 }}
+{{ include "ddns-do.labels" . | indent 4 }}
 spec:
-  schedule: "*/5 * * * *"
+  schedule: {{ .Values.schedule | quote }}
   concurrencyPolicy: Forbid
   jobTemplate:
     spec:
       template:
         spec:
           containers:
-            - name: ddns-route53
+            - name: ddns-do
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
               imagePullPolicy: {{ .Values.image.pullPolicy }}
               env:
-                - name: DDNS_ROUTE53_TTL
+                - name: DDNS_DO_TTL
                   value: "300"
-                - name: DDNS_ROUTE53_ZONE_ID
-                  value: {{ .Values.zoneId }}
-                - name: DDNS_ROUTE53_RECORD_SET
-                  value: {{ .Values.recordSet }}
-                - name: AWS_ACCESS_KEY_ID
+                - name: DDNS_DO_DOMAIN
+                  value: {{ .Values.domain | quote }}
+                - name: DDNS_DO_RECORD
+                  value: {{ .Values.record | quote }}
+                - name: DIGITALOCEAN_ACCESS_TOKEN
                   valueFrom:
                     secretKeyRef:
-                      name: {{ include "ddns-route53.fullname" . }}
-                      key: access_key_id
-                - name: AWS_SECRET_ACCESS_KEY
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ include "ddns-route53.fullname" . }}
-                      key: secret_access_key
+                      name: {{ include "ddns-do.fullname" . }}
+                      key: access_key
           {{- with .Values.nodeSelector }}
           nodeSelector:
             {{- toYaml . | nindent 8 }}

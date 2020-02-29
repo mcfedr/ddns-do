@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 
 declare -r DATE_FORMAT="%Y-%m-%d %H:%M:%S"
-declare -r VERSION="2.0.2"
-declare ttl=${DDNS_ROUTE53_TTL:-300}
-declare record_type="${DDNS_ROUTE53_TYPE:-A}"
-declare comment="${DDNS_ROUTE53_COMMENT:-Updated at $(date +"$DATE_FORMAT")}"
-declare zone_id="$DDNS_ROUTE53_ZONE_ID"
-declare record_set="$DDNS_ROUTE53_RECORD_SET"
-declare handler_script="$DDNS_ROUTE53_SCRIPT"
+declare -r VERSION="1.0.0"
+declare ttl=${DDNS_DO_TTL:-300}
+declare record_type="${DDNS_DO_TYPE:-A}"
+declare domain="$DDNS_DO_DOMAIN"
+declare record="$DDNS_DO_RECORD"
+declare handler_script="$DDNS_DO_SCRIPT"
 declare old_ip ip
 
 function errlog() {
@@ -22,11 +21,11 @@ function usage() {
   cat <<HELP
 Usage: $(basename "$0") [OPTIONS]
 
-Dynamic DNS updater using Amazon Route53.
+Dynamic DNS updater using Digital Ocean Domains.
 
 Options:
-  -z, --zone-id <ZONE_ID>         Amazon Route53 hosted zone ID (required)
-  -r, --record-set <RECORD_SET>   Amazon Route53 record set name (required)
+  -d, --domain <DOMAIN>         Digital Ocean Domain (required)
+  -r, --record <RECORD>   Digital Ocean domain record name (required)
   -t, --ttl <SECONDS>             TTL for DNS record
   -y, --type <TYPE>               DNS record type
   -i, --ip <IP_ADDRESS>           Force usage of IP address
@@ -48,17 +47,15 @@ function valid-ip() {
 }
 
 function fetch-current-ip() {
-  aws route53 list-resource-record-sets \
-    --hosted-zone-id "$zone_id" \
-    --output text \
-    --query "ResourceRecordSets[?Name == '$record_set.' && Type == '$record_type'].ResourceRecords[0].Value | [0] || ''"
+  doctl compute domain records list "$domain" --no-header --format Name,Type,Data | \
+    awk -F " " '{ if ($1 == "'$record'" && $2 == "'$record_type'") { print $3; exit }}'
 }
 
 function init-args() {
   while (( $# > 0 )); do
     case "$1" in
-      -z|--zone-id) zone_id="$2"; shift ;;
-      -r|--record-set) record_set="$2"; shift ;;
+      -d|--domain) domain="$2"; shift ;;
+      -r|--record) record="$2"; shift ;;
       -i|--ip) ip="$2"; shift ;;
       -t|--ttl) ttl="$2"; shift ;;
       -y|--type) record_type="$2"; shift ;;
@@ -77,11 +74,11 @@ function init-args() {
 }
 
 function validate-args() {
-  if [[ -z "$zone_id" ]]; then
-    errlog "Missing -z or --zone-id or \$DDNS_ROUTE53_ZONE_ID"
+  if [[ -z "$domain" ]]; then
+    errlog "Missing -d or --domain or \$DDNS_DO_DOMAIN"
     return 1
-  elif [[ -z "$record_set" ]]; then
-    errlog "Missing -r or --record-set or \$DDNS_ROUTE53_RECORD_SET"
+  elif [[ -z "$record" ]]; then
+    errlog "Missing -r or --record or \$DDNS_DO_RECORD"
     return 1
   elif [[ -n "$handler_script" && ! -x "$handler_script" ]]; then
     errlog "Script at '$handler_script' is not executable"
@@ -94,24 +91,17 @@ function validate-args() {
 }
 
 function update-dns-entry() {
-  local ip=$1 output success batch
-  read -r -d '' batch << EOF
-{
-  "Comment": "$comment",
-  "Changes": [
-    {
-      "Action": "UPSERT",
-      "ResourceRecordSet": {
-        "ResourceRecords": [{"Value": "$ip"}],
-        "Name": "$record_set",
-        "Type": "$record_type",
-        "TTL": $ttl
-      }
-    }
-  ]
-}
-EOF
-  output="$(aws route53 change-resource-record-sets --hosted-zone-id "$zone_id" --change-batch "$batch" 2>&1)"
+  local ip=$1
+
+  local existingId="$(doctl compute domain records list "$domain" --no-header --format Name,Type,ID | \
+    awk -F " " '{ if ($1 == "'$record'" && $2 == "'$record_type'") { print $3; exit }}')"
+
+  if [[ -n "$existingId" ]]; then
+  	output="$(doctl compute domain records update "$domain" --record-id "$existingId" --record-type "$record_type" --record-ttl "$ttl" --record-name "$record" --record-data "$ip")"
+	else
+		output="$(doctl compute domain records create "$domain" --record-type "$record_type" --record-ttl "$ttl" --record-name "$record" --record-data "$ip")"
+	fi
+
   success=$?
   if (( success == 0 )); then
     log "$output"

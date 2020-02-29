@@ -1,5 +1,5 @@
 image:
-  repository: mthssdrbrg/ddns-route53
+  repository: mcfedr/ddns-do
   tag: latest
   pullPolicy: Always
 
@@ -11,7 +11,7 @@ resources: {}
 tolerations: []
 affinity: {}
 
-zoneId: ZXXXX
-recordSet: example.com.
-awsAccessKeyId: ""
-awsSecretAccessKey: ""
+domain: ZXXXX
+record: example.com.
+doAccessKey: ""
+schedule: "*/5 * * * *"

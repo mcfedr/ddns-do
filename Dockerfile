@@ -1,9 +1,9 @@
-FROM python:3-alpine
-LABEL maintainer "Mathias Söderberg <mths@sdrbrg.se>"
+FROM digitalocean/doctl:1-latest
 
-RUN apk --no-cache add bash bind-tools && \
-  pip install --no-cache-dir awscli==1.11.158
+RUN ln -s /app/doctl /usr/bin/doctl
 
-COPY ddns-route53 /usr/local/bin/ddns-route53
+RUN apk --no-cache add bash bind-tools
 
-ENTRYPOINT ["/usr/local/bin/ddns-route53"]
+COPY ddns-do /usr/local/bin/ddns-do
+
+ENTRYPOINT ["/usr/local/bin/ddns-do"]
