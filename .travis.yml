@@ -1,10 +1,12 @@
-language: bash
-dist: trusty
-addons:
-  apt:
-    sources:
-      - sourceline: "deb http://archive.ubuntu.com/ubuntu/ trusty-backports universe"
-    packages:
-      - shellcheck
+language: shell
+dist: bionic
+
+env:
+  - SHFMT_URL=https://github.com/mvdan/sh/releases/download/v3.1.1/shfmt_v3.1.1_linux_amd64
+
+install:
+  - curl -sSL $SHFMT_URL -o ~/shfmt && chmod +x ~/shfmt
+
 script:
-  - shellcheck $(find . -maxdepth 1 -type f -executable)
+  - ~/shfmt -d -i 2 update.sh
+  - shellcheck ddns-do

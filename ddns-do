@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-declare -r DATE_FORMAT="%Y-%m-%d %H:%M:%S"
 declare -r VERSION="1.0.0"
 declare ttl=${DDNS_DO_TTL:-300}
 declare record_type="${DDNS_DO_TYPE:-A}"
@@ -38,38 +37,66 @@ HELP
 function valid-ip() {
   local ip=$1 octets
   if [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-    IFS='.' read -r -a octets <<< "$ip"
-    for octet in $octets; do
-      (( octet <= 255 )) || return 1
+    IFS='.' read -r -a octets <<<"$ip"
+    for octet in "${octets[@]}"; do
+      ((octet <= 255)) || return 1
     done
   fi
   return 0
 }
 
 function fetch-current-ip() {
-  doctl compute domain records list "$domain" --no-header --format Name,Type,Data | \
-    awk -F " " '{ if ($1 == "'$record'" && $2 == "'$record_type'") { print $3; exit }}'
+  doctl compute domain records list "$domain" --no-header --format Name,Type,Data |
+    awk -F " " '{ if ($1 == "'"$record"'" && $2 == "'"$record_type"'") { print $3; exit }}'
 }
 
 function init-args() {
-  while (( $# > 0 )); do
+  while (($# > 0)); do
     case "$1" in
-      -d|--domain) domain="$2"; shift ;;
-      -r|--record) record="$2"; shift ;;
-      -i|--ip) ip="$2"; shift ;;
-      -t|--ttl) ttl="$2"; shift ;;
-      -y|--type) record_type="$2"; shift ;;
-      -s|--script) handler_script="$2"; shift ;;
-      -h|--help) usage; exit 0 ;;
-      -v|--version) echo "$VERSION"; exit 0 ;;
-      *) errlog "Unknown option: $1"; usage; exit 1 ;;
+    -d | --domain)
+      domain="$2"
+      shift
+      ;;
+    -r | --record)
+      record="$2"
+      shift
+      ;;
+    -i | --ip)
+      ip="$2"
+      shift
+      ;;
+    -t | --ttl)
+      ttl="$2"
+      shift
+      ;;
+    -y | --type)
+      record_type="$2"
+      shift
+      ;;
+    -s | --script)
+      handler_script="$2"
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -v | --version)
+      echo "$VERSION"
+      exit 0
+      ;;
+    *)
+      errlog "Unknown option: $1"
+      usage
+      exit 1
+      ;;
     esac
     shift
   done
   if [[ -z "$ip" ]]; then
     ip="$(dig +short -4 myip.opendns.com @resolver1.opendns.com)"
   fi
-  old_ip="$(fetch-current-ip 2> /dev/null)"
+  old_ip="$(fetch-current-ip 2>/dev/null)"
   return 0
 }
 
@@ -93,17 +120,18 @@ function validate-args() {
 function update-dns-entry() {
   local ip=$1
 
-  local existingId="$(doctl compute domain records list "$domain" --no-header --format Name,Type,ID | \
-    awk -F " " '{ if ($1 == "'$record'" && $2 == "'$record_type'") { print $3; exit }}')"
+  local existingId
+  existingId="$(doctl compute domain records list "$domain" --no-header --format Name,Type,ID |
+    awk -F " " '{ if ($1 == "'"$record"'" && $2 == "'"$record_type"'") { print $3; exit }}')"
 
   if [[ -n "$existingId" ]]; then
-  	output="$(doctl compute domain records update "$domain" --record-id "$existingId" --record-type "$record_type" --record-ttl "$ttl" --record-name "$record" --record-data "$ip")"
-	else
-		output="$(doctl compute domain records create "$domain" --record-type "$record_type" --record-ttl "$ttl" --record-name "$record" --record-data "$ip")"
-	fi
+    output="$(doctl compute domain records update "$domain" --record-id "$existingId" --record-type "$record_type" --record-ttl "$ttl" --record-name "$record" --record-data "$ip")"
+  else
+    output="$(doctl compute domain records create "$domain" --record-type "$record_type" --record-ttl "$ttl" --record-name "$record" --record-data "$ip")"
+  fi
 
   success=$?
-  if (( success == 0 )); then
+  if ((success == 0)); then
     log "$output"
   else
     errlog "Failed to update DNS entry:"
