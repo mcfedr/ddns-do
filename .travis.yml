@@ -8,5 +8,5 @@ install:
   - curl -sSL $SHFMT_URL -o ~/shfmt && chmod +x ~/shfmt
 
 script:
-  - ~/shfmt -d -i 2 update.sh
+  - ~/shfmt -d -i 2 ddns-do
   - shellcheck ddns-do
