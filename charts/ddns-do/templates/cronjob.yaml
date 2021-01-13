@@ -8,8 +8,11 @@ spec:
   schedule: {{ .Values.schedule | quote }}
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 150
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
+      ttlSecondsAfterFinished: 300
       template:
         spec:
           containers:
